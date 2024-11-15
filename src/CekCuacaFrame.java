@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import javax.swing.DefaultComboBoxModel;
 import javax.swing.ImageIcon;
 import javax.swing.JOptionPane;
 import org.json.JSONObject;
@@ -117,6 +118,11 @@ public class CekCuacaFrame extends javax.swing.JFrame {
         jPanel1.add(txtNamaKota, gridBagConstraints);
 
         cmbKotaFavorit.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Banjar", "Banjarmasin", "Banjarbaru" }));
+        cmbKotaFavorit.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                cmbKotaFavoritActionPerformed(evt);
+            }
+        });
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 1;
         gridBagConstraints.gridy = 1;
@@ -170,8 +176,19 @@ public class CekCuacaFrame extends javax.swing.JFrame {
         cekCuaca();
     }//GEN-LAST:event_btnCekCuacaActionPerformed
 
+    private void cmbKotaFavoritActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cmbKotaFavoritActionPerformed
+        txtNamaKota.setText((String) cmbKotaFavorit.getSelectedItem());
+    }//GEN-LAST:event_cmbKotaFavoritActionPerformed
+
     private void cekCuaca() {
-        String API_KEY = "e57367f6bf9f06154278b83d65a4a557"; // Ganti dengan API Key OpenWeatherMap Anda
+        // Reset label sebelum memulai proses baru
+        labelNamaCuaca.setText("Memuat...");
+        labelSuhuCuaca.setText("Memuat...");
+        labelKeterangan.setText("");
+        labelGambar.setIcon(null);
+        labelGambar.setText("Memuat...");
+
+        String API_KEY = "e57367f6bf9f06154278b83d65a4a557"; // API Key yang diberikan
         String BASE_URL = "https://api.openweathermap.org/data/2.5/weather";
         String namaKota = txtNamaKota.getText();
 
@@ -181,7 +198,8 @@ public class CekCuacaFrame extends javax.swing.JFrame {
         }
 
         try {
-            String endpoint = BASE_URL + "?q=" + namaKota + "&appid=" + API_KEY + "&units=metric";
+            // Tambahkan parameter lang=id untuk bahasa Indonesia
+            String endpoint = BASE_URL + "?q=" + namaKota + "&appid=" + API_KEY + "&units=metric&lang=id";
             URL url = new URL(endpoint);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
@@ -199,6 +217,10 @@ public class CekCuacaFrame extends javax.swing.JFrame {
 
                 // Parse dan tampilkan hasil
                 parseCuacaData(response.toString());
+
+                // Setelah cuaca berhasil, tambahkan kota ke dalam JComboBox jika belum ada
+                addKotaToFavorite(namaKota);
+
             } else {
                 showErrorDialog("Gagal mengambil data. Periksa nama kota atau koneksi internet!");
             }
@@ -208,17 +230,31 @@ public class CekCuacaFrame extends javax.swing.JFrame {
         }
     }
 
+    private void addKotaToFavorite(String kota) {
+        // Ambil data dari ComboBox
+        DefaultComboBoxModel<String> model = (DefaultComboBoxModel<String>) cmbKotaFavorit.getModel();
+
+        // Periksa apakah kota sudah ada di dalam ComboBox
+        if (model.getIndexOf(kota) == -1) {
+            // Jika kota belum ada, tambahkan kota ke dalam ComboBox
+            model.addElement(kota);
+        }
+    }
+
     private void parseCuacaData(String response) {
         try {
             JSONObject jsonObj = new JSONObject(response);
+
+            // Ambil data cuaca dari response
             String namaCuaca = jsonObj.getJSONArray("weather").getJSONObject(0).getString("main");
             String deskripsi = jsonObj.getJSONArray("weather").getJSONObject(0).getString("description");
             String ikon = jsonObj.getJSONArray("weather").getJSONObject(0).getString("icon");
             double suhu = jsonObj.getJSONObject("main").getDouble("temp");
 
             // Menampilkan data di label
-            labelNamaCuaca.setText(namaCuaca + " - " + deskripsi);
+            labelNamaCuaca.setText(namaCuaca);
             labelSuhuCuaca.setText("Suhu: " + suhu + "°C");
+            labelKeterangan.setText("Keterangan: " + deskripsi); // Tambahkan keterangan ke label tambahan
 
             // Menampilkan ikon cuaca
             String imageUrl = "https://openweathermap.org/img/wn/" + ikon + "@2x.png";
