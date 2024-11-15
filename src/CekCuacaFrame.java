@@ -1,12 +1,20 @@
 
 import java.awt.Image;
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import javax.swing.DefaultComboBoxModel;
 import javax.swing.ImageIcon;
+import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
+import javax.swing.table.DefaultTableModel;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 /*
@@ -143,6 +151,11 @@ public class CekCuacaFrame extends javax.swing.JFrame {
         jPanel1.add(btnCekCuaca, gridBagConstraints);
 
         btnLoadData.setText("LOAD");
+        btnLoadData.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnLoadDataActionPerformed(evt);
+            }
+        });
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 2;
         gridBagConstraints.gridy = 3;
@@ -151,6 +164,11 @@ public class CekCuacaFrame extends javax.swing.JFrame {
         jPanel1.add(btnLoadData, gridBagConstraints);
 
         btnSimpanData.setText("SIMPAN");
+        btnSimpanData.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnSimpanDataActionPerformed(evt);
+            }
+        });
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 2;
         gridBagConstraints.gridy = 2;
@@ -179,6 +197,58 @@ public class CekCuacaFrame extends javax.swing.JFrame {
     private void cmbKotaFavoritActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cmbKotaFavoritActionPerformed
         txtNamaKota.setText((String) cmbKotaFavorit.getSelectedItem());
     }//GEN-LAST:event_cmbKotaFavoritActionPerformed
+
+    private void btnSimpanDataActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnSimpanDataActionPerformed
+        simpanDataKeCSV();
+    }//GEN-LAST:event_btnSimpanDataActionPerformed
+
+    private void btnLoadDataActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnLoadDataActionPerformed
+        muatDataDariCSV();
+    }//GEN-LAST:event_btnLoadDataActionPerformed
+
+    private void muatDataDariCSV() {
+        // Membuka JFileChooser untuk memilih file CSV
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("Pilih File CSV untuk Memuat Data");
+
+        // Menampilkan dialog untuk memilih file
+        int userSelection = fileChooser.showOpenDialog(this);
+
+        // Jika pengguna memilih file
+        if (userSelection == JFileChooser.APPROVE_OPTION) {
+            File fileToOpen = fileChooser.getSelectedFile();
+
+            // Membaca file CSV
+            try (BufferedReader reader = new BufferedReader(new FileReader(fileToOpen))) {
+                DefaultTableModel model = (DefaultTableModel) jTable1.getModel();
+                model.setRowCount(0); // Menghapus baris yang sudah ada dalam tabel
+
+                String line;
+                boolean isHeader = true;
+
+                while ((line = reader.readLine()) != null) {
+                    String[] data = line.split(",");
+
+                    // Jika ini adalah baris header, skip
+                    if (isHeader) {
+                        isHeader = false;
+                        continue; // Melewati header CSV
+                    }
+
+                    // Menambahkan data ke dalam tabel
+                    model.addRow(data);
+                }
+
+                // Menampilkan pesan sukses
+                JOptionPane.showMessageDialog(this, "Data berhasil dimuat dari file: " + fileToOpen.getAbsolutePath());
+
+            } catch (IOException e) {
+                // Menangani kesalahan jika terjadi error saat membaca file
+                e.printStackTrace();
+                JOptionPane.showMessageDialog(this, "Terjadi kesalahan saat memuat data: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
 
     private void cekCuaca() {
         // Reset label sebelum memulai proses baru
@@ -218,6 +288,9 @@ public class CekCuacaFrame extends javax.swing.JFrame {
                 // Parse dan tampilkan hasil
                 parseCuacaData(response.toString());
 
+                // Setelah cuaca berhasil, tambahkan kota ke dalam JTable jika belum ada
+                addCuacaToTable(namaKota, response.toString());
+
                 // Setelah cuaca berhasil, tambahkan kota ke dalam JComboBox jika belum ada
                 addKotaToFavorite(namaKota);
 
@@ -227,6 +300,86 @@ public class CekCuacaFrame extends javax.swing.JFrame {
         } catch (Exception e) {
             e.printStackTrace();
             showErrorDialog("Terjadi kesalahan: " + e.getMessage());
+        }
+    }
+
+    private void addCuacaToTable(String kota, String jsonResponse) {
+        // Ambil data dari ComboBox
+        DefaultTableModel model = (DefaultTableModel) jTable1.getModel();
+
+        // Periksa apakah kota sudah ada di dalam tabel
+        for (int i = 0; i < model.getRowCount(); i++) {
+            if (model.getValueAt(i, 0).equals(kota)) {
+                // Jika kota sudah ada, tidak perlu menambahkan lagi
+                return;
+            }
+        }
+
+        // Ambil data cuaca dari jsonResponse (parsing JSON)
+        try {
+            JSONObject jsonObject = new JSONObject(jsonResponse);
+            // Ambil data cuaca dari response
+            String namaCuaca = jsonObject.getJSONArray("weather").getJSONObject(0).getString("main");
+            String deskripsi = jsonObject.getJSONArray("weather").getJSONObject(0).getString("description");
+            String suhuCuaca = String.valueOf(jsonObject.getJSONObject("main").getDouble("temp"));
+
+            // Menambah data cuaca ke dalam JTable
+            model.addRow(new Object[]{kota, namaCuaca, deskripsi, suhuCuaca + " °C"});
+        } catch (JSONException e) {
+            e.printStackTrace();
+            showErrorDialog("Terjadi kesalahan saat memparsing data cuaca.");
+        }
+    }
+
+    private void simpanDataKeCSV() {
+        // Membuka JFileChooser untuk memilih lokasi dan nama file
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("Simpan Data Cuaca");
+        fileChooser.setSelectedFile(new File("data_cuaca.csv")); // Menetapkan nama default file
+
+        // Menampilkan dialog untuk memilih file
+        int userSelection = fileChooser.showSaveDialog(this);
+
+        // Jika pengguna memilih untuk menyimpan
+        if (userSelection == JFileChooser.APPROVE_OPTION) {
+            File fileToSave = fileChooser.getSelectedFile();
+
+            // Jika file tidak memiliki ekstensi .csv, tambahkan ekstensi .csv
+            if (!fileToSave.getAbsolutePath().endsWith(".csv")) {
+                fileToSave = new File(fileToSave.getAbsolutePath() + ".csv");
+            }
+
+            try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileToSave))) {
+                // Menulis header CSV (kolom tabel)
+                DefaultTableModel model = (DefaultTableModel) jTable1.getModel();
+                int columnCount = model.getColumnCount();
+                for (int i = 0; i < columnCount; i++) {
+                    writer.write(model.getColumnName(i)); // Menulis nama kolom
+                    if (i < columnCount - 1) {
+                        writer.write(",");
+                    }
+                }
+                writer.newLine(); // Pindah baris setelah header
+
+                // Menulis data dari tabel
+                int rowCount = model.getRowCount();
+                for (int i = 0; i < rowCount; i++) {
+                    for (int j = 0; j < columnCount; j++) {
+                        writer.write(model.getValueAt(i, j).toString()); // Menulis nilai dari setiap sel
+                        if (j < columnCount - 1) {
+                            writer.write(",");
+                        }
+                    }
+                    writer.newLine(); // Pindah baris setelah satu baris data
+                }
+
+                // Menampilkan pesan sukses
+                JOptionPane.showMessageDialog(this, "Data berhasil disimpan ke: " + fileToSave.getAbsolutePath());
+            } catch (IOException e) {
+                // Menangani kesalahan jika terjadi error saat menulis file
+                e.printStackTrace();
+                JOptionPane.showMessageDialog(this, "Terjadi kesalahan saat menyimpan data: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            }
         }
     }
 
